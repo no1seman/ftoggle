@@ -1,0 +1,86 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'com.example'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Test dependencies
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:3.12.4'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api:1.7.32'
+    implementation 'ch.qos.logback:logback-classic:1.2.6'
+    
+    // Configuration
+    implementation 'com.typesafe:config:1.4.1'
+}
+
+application {
+    mainClass = 'com.example.Main'
+}
+
+// Custom task to generate feature flags class
+task generateFeatureFlags {
+    doLast {
+        def featureFlagsDir = new File("${projectDir}/src/main/java/com/example/config")
+        featureFlagsDir.mkdirs()
+        
+        def featureFlagsFile = new File(featureFlagsDir, "FeatureFlags.java")
+        featureFlagsFile.text = """
+package com.example.config;
+
+public final class FeatureFlags {
+    public static final boolean DARK_MODE_ENABLED = ${project.hasProperty('darkMode') ? project.darkMode : true};
+    public static final boolean NOTIFICATIONS_ENABLED = ${project.hasProperty('notifications') ? project.notifications : true};
+    public static final boolean NEW_PAYMENT_SYSTEM_ENABLED = ${project.hasProperty('newPaymentSystem') ? project.newPaymentSystem : false};
+    
+    private FeatureFlags() {
+        // Prevent instantiation
+    }
+}
+"""
+    }
+}
+
+// Make compileJava depend on generateFeatureFlags
+compileJava.dependsOn generateFeatureFlags
+
+// Custom task for cleaning generated files
+clean {
+    delete "${projectDir}/src/main/java/com/example/config/FeatureFlags.java"
+}
+
+// Test configuration
+test {
+    useJUnit()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
+// JAR configuration
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'com.example.Main',
+            'Implementation-Title': 'Feature Toggle Demo',
+            'Implementation-Version': project.version
+        )
+    }
+    
+    // Include dependencies in the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
